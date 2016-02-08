@@ -1,6 +1,6 @@
 # Starfighter Terminal Debugger
 
-![Silly screenshot](https://www.dropbox.com/s/e8sposgn9f2cru1/Screenshot%202016-02-08%2017.20.09.png?dl=0)
+[Silly screenshot](https://www.dropbox.com/s/e8sposgn9f2cru1/Screenshot%202016-02-08%2017.20.09.png?dl=0)
 
 TAB switches tabs. PgUp/PgDown scrolls main window.
 
