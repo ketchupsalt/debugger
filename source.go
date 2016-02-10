@@ -50,6 +50,7 @@ type CompileMsg struct {
 	Ep      int      `json:"ep"`
 	Raw64   string   `json:"raw"`
 	BSS64   string   `json:"bss"`
+	Token   string   `json:"token"`
 	raw     []byte
 	bss     []byte
 }
@@ -107,6 +108,7 @@ func (self *source) flash() {
 		Raw64 string `json:"raw"`
 		Bss64 string `json:"bss"`
 		Ep    int    `json:"ep"`
+		Token string `json:"token"`
 	}
 
 	wm := &WriteMsg{}
@@ -119,6 +121,7 @@ func (self *source) flash() {
 	wm.Raw64 = base64.StdEncoding.EncodeToString(self.compiled.raw)
 	wm.Bss64 = base64.StdEncoding.EncodeToString(self.compiled.bss)
 	wm.Ep = self.compiled.Ep
+	wm.Token = self.compiled.Token
 
 	buf, _ := json.Marshal(wm)
 
