@@ -16,10 +16,11 @@ import (
 // something, and then use "logf" to print output to the console.
 
 type commandLine struct {
-	c          chan event
-	history    []string
-	historyPos int
-	savedLine  string
+	c           chan event
+	history     []string
+	historyPos  int
+	savedLine   string
+	lastCommand string
 }
 
 func (self *commandLine) deliver(e event) {
@@ -49,6 +50,8 @@ var (
 	rxtri = regexp.MustCompile("@(r|$)([0-9]+)")
 	rxtr  = regexp.MustCompile("(r|$)([0-9]+)")
 	rxta  = regexp.MustCompile("@([0-9a-fA-F]+)")
+
+	rxrep = regexp.MustCompile("^([0-9]+)x\\s+")
 )
 
 func (self *commandLine) read(line string) {
@@ -188,6 +191,34 @@ func (self *commandLine) read(line string) {
 }
 
 func (self *commandLine) parse(line string) {
+	for _, term := range strings.Split(line, ";") {
+		term = strings.Trim(term, " \t")
+		repeat := 1
+		if m := rxrep.FindStringSubmatch(term); m != nil {
+			repeat, _ = strconv.Atoi(m[1])
+			term = strings.Trim(term[len(m[1])+2:], " \t")
+		}
+
+		if !self.parseTerm(term) {
+			logf("bad command '%s'", term)
+			break
+		} else if term != "" {
+			self.lastCommand = term
+		}
+
+		for i := 0; i < repeat-1; i++ {
+			self.parseTerm(term)
+		}
+	}
+}
+
+func (self *commandLine) parseTerm(line string) (success bool) {
+	success = true
+
+	if line == "" && self.lastCommand != "" {
+		line = self.lastCommand
+	}
+
 	switch {
 	case strings.HasPrefix(line, "read/"):
 		fallthrough
@@ -201,8 +232,8 @@ func (self *commandLine) parse(line string) {
 
 	toks := strings.Split(line, " ")
 	switch toks[0] {
-	case "clr", "cls": 
-	  	Log.deliver(event{kind: CLEAR})
+	case "clr", "cls":
+		Log.deliver(event{kind: CLEAR})
 	case "vmload":
 		Session.post("/vm/load", "")
 		logf("requesting code load")
@@ -268,6 +299,12 @@ func (self *commandLine) parse(line string) {
 			logf("%.3d.  %0.4x", i, addr)
 		}
 		logf("")
+
+	case "uptime":
+		res, err := Session.get("/uptime")
+		if res.HTTPOK(err) {
+			logf(string(res.body))
+		}
 
 	case "runto", "rt":
 		if len(toks) > 1 {
@@ -357,10 +394,10 @@ func (self *commandLine) parse(line string) {
 		}
 		return
 	default:
-		break
+		success = false
 	}
 
-	redraw()
+	return
 }
 
 func (self *commandLine) flush() {
