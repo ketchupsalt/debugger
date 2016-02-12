@@ -38,6 +38,7 @@ func (self *response) OK(err error) bool {
 	type Ok struct {
 		Ok    bool   `json:"ok"`
 		Error string `json:"error"`
+		Text  string `json:"text"`
 	}
 	if err != nil {
 		logError(self.path, err)
@@ -50,7 +51,11 @@ func (self *response) OK(err error) bool {
 			if ok.Ok {
 				return true
 			} else {
-				logf("%s error: %s", self.path, ok.Error)
+				errs := ok.Error
+				if ok.Text != "" {
+					errs = ok.Text
+				}
+				logf("%s error: %s", self.path, errs)
 			}
 		} else {
 			logf("%s bad json: %s (%s)", self.path, err, self.body)
