@@ -75,12 +75,12 @@ func (self *dump) draw(v *gocui.View, refresh bool) {
 
 	p, _ := fmt.Fprintf(v, "%0.4X:   ", self.addr)
 	xpos += p
-	bytesThisLine := 0
+	bytesThisLine := 1
 
 	for off, b := range self.contents {
 		need := 3
 		pad := " "
-		if bytesThisLine != 0 && bytesThisLine%4 == 0 {
+		if bytesThisLine != 1 && bytesThisLine%4 == 0 {
 			need += 2
 			pad = "   "
 		}
@@ -90,7 +90,7 @@ func (self *dump) draw(v *gocui.View, refresh bool) {
 			xpos += p
 		} else {
 			xpos = 0
-			bytesThisLine = 1
+			bytesThisLine = 2
 			ypos += 1
 
 			v.Write([]byte("\n"))
