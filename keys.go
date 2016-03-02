@@ -34,6 +34,7 @@ const (
 	DOWN
 	STACK_BUMP
 	CLEAR
+	SAVE
 )
 
 var modal = 0

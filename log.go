@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/jroimartin/gocui"
 )
@@ -32,6 +33,22 @@ func (self *logbox) draw(v *gocui.View, refresh bool) {
 	self.written = len(self.log)
 }
 
+func (self *logbox) save(file string) {
+	f, err := os.OpenFile(file, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
+	if err != nil {
+		logf("can't open %s: %s", f, err)
+		return
+	}
+
+	for _, line := range self.log {
+		fmt.Fprintf(f, "%s\n", line)
+	}
+
+	logf("saved to %s", file)
+
+	f.Close()
+}
+
 func (self *logbox) logLine(line string) {
 	self.log = append(self.log, line)
 	v, _ := g.View("tabview")
@@ -54,6 +71,8 @@ func (self *logbox) loop() {
 			self.clear()
 		case LINE:
 			self.logLine(e.data)
+		case SAVE:
+			self.save(e.data)
 		}
 	}
 }

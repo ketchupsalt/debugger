@@ -47,6 +47,7 @@ type event struct {
 	kind int
 	data string
 	addr int
+	done *chan bool
 }
 
 // receiver is a component of the system that listens to messages; this

@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"io/ioutil"
+	"os"
 
 	"github.com/jroimartin/gocui"
 )
@@ -65,6 +66,10 @@ func (self *source) compile() {
 		return
 	}
 
+	f, _ := os.OpenFile("/tmp/compile.out", os.O_WRONLY|os.O_CREATE, 0644)
+	f.Write(res.body)
+	f.Close()
+
 	if err := json.Unmarshal(res.body, &self.compiled); err != nil {
 		logf("can't unmarshal: %s", err)
 	}
@@ -97,6 +102,10 @@ func (self *source) loop() {
 			self.load(e.data)
 		case COMPILE:
 			self.compile()
+		}
+
+		if e.done != nil {
+			*e.done <- true
 		}
 
 		redraw()

@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/jroimartin/gocui"
@@ -24,6 +25,20 @@ func (self *output) deliver(e event) {
 
 func (self *output) makechan() {
 	self.c = make(chan event)
+}
+
+func (self *output) save(file string) {
+	f, err := os.OpenFile(file, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
+	if err != nil {
+		logf("can't open %s: %s", f, err)
+		return
+	}
+
+	f.Write(self.contents.Bytes())
+
+	logf("saved to %s", file)
+
+	f.Close()
 }
 
 func (self *output) draw(v *gocui.View, refresh bool) {
@@ -108,6 +123,8 @@ func (self *output) loop() {
 	for {
 		e := <-self.c
 		switch e.kind {
+		case SAVE:
+			self.save(e.data)
 		case FETCH:
 			self.fetch()
 		}

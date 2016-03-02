@@ -3,9 +3,11 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"io/ioutil"
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/jroimartin/gocui"
 )
@@ -21,6 +23,8 @@ type commandLine struct {
 	historyPos  int
 	savedLine   string
 	lastCommand string
+	macros      map[string]string
+	done        chan bool
 }
 
 func (self *commandLine) deliver(e event) {
@@ -160,7 +164,7 @@ func (self *commandLine) read(line string) {
 			logf("can't read %0.4x", addr)
 		}
 	case S:
-		if blob = peek(uint16(addr), 64); blob != nil {
+		if blob = peek(uint16(addr), 128); blob != nil {
 			off := bytes.Index(blob, []byte("\x00"))
 			if off != -1 {
 				blob = blob[0:off]
@@ -191,6 +195,12 @@ func (self *commandLine) read(line string) {
 }
 
 func (self *commandLine) parse(line string) {
+	if macro, ok := self.macros[strings.Trim(line, " \t")]; ok {
+		logf("executing %s", macro)
+		self.parse(macro)
+		return
+	}
+
 	for _, term := range strings.Split(line, ";") {
 		term = strings.Trim(term, " \t")
 		repeat := 1
@@ -232,6 +242,12 @@ func (self *commandLine) parseTerm(line string) (success bool) {
 
 	toks := strings.Split(line, " ")
 	switch toks[0] {
+	case "wait":
+		if duration, err := time.ParseDuration(toks[1]); err == nil {
+			time.Sleep(duration)
+		} else {
+			logf("bad duration: %s", err)
+		}
 	case "clr", "cls":
 		Log.deliver(event{kind: CLEAR})
 	case "vmload":
@@ -261,11 +277,28 @@ func (self *commandLine) parseTerm(line string) (success bool) {
 		}
 
 	case "compile":
-		Source.deliver(event{kind: COMPILE})
+		Source.deliver(event{kind: COMPILE, done: &self.done})
+		<-self.done
 	case "load":
 		if len(toks) > 1 {
-			Source.deliver(event{kind: LOAD, data: toks[1]})
+			Source.deliver(event{kind: LOAD, data: toks[1], done: &self.done})
+			<-self.done
 		}
+
+	case "save":
+		if len(toks) > 2 {
+			switch toks[1] {
+			case "log":
+				Log.deliver(event{kind: SAVE, data: toks[2]})
+			case "output":
+				Output.deliver(event{kind: SAVE, data: toks[2]})
+			default:
+				logf("don't know how to save '%s'", toks[1])
+			}
+		} else {
+			logf("save [thing to save] [logfile]")
+		}
+
 	case "functions":
 		if len(toks) > 1 {
 			logf("All functions matching %s:", toks[1])
@@ -304,6 +337,15 @@ func (self *commandLine) parseTerm(line string) (success bool) {
 		res, err := Session.get("/uptime")
 		if res.HTTPOK(err) {
 			logf(string(res.body))
+		}
+
+	case "select":
+		if len(toks) > 1 {
+			level, _ := strconv.Atoi(toks[1])
+			res, err := Session.post("/select", fmt.Sprintf("{\"level\":%d}", level))
+			if res.HTTPOK(err) {
+				logf("selected level %d", level)
+			}
 		}
 
 	case "runto", "rt":
@@ -423,7 +465,40 @@ func (self *commandLine) fromHistory() {
 	})
 }
 
+func (self *commandLine) loadMacros(file string) {
+	if self.macros == nil {
+		self.macros = map[string]string{}
+
+		buf, err := ioutil.ReadFile(file)
+		if err != nil {
+			logf("couldn't open \"%s\"; macros not loaded", file)
+			return
+		}
+
+		for _, macro := range strings.Split(string(buf), "\n") {
+			tups := strings.SplitN(macro, ":", 2)
+			if len(tups) != 2 {
+				continue
+			}
+
+			self.macros[strings.Trim(tups[0], " \t")] = strings.Trim(tups[1], " \t")
+		}
+	}
+}
+
+func (self *commandLine) init() {
+	if self.macros == nil {
+		self.loadMacros("macros.cmd")
+	}
+
+	if self.done == nil {
+		self.done = make(chan bool)
+	}
+}
+
 func (self *commandLine) loop() {
+	self.init()
+
 	for {
 		event := <-self.c
 		switch event.kind {
